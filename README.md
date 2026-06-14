@@ -2,8 +2,6 @@
 
 **An AI and Blockchain-Enabled Supply Chain Forecasting Analysis System for Sri Lanka's Tea Industry**
 
-> S.P. Navindu Prabhashana — CL/BSCSD/33/160 | Software Engineering Dissertation Project
-
 ---
 
 ## Overview
@@ -21,7 +19,7 @@ BloxLogicAI combines three technologies into one lightweight, Python-based web a
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/<your-username>/BloxLogicAI.git
+git clone https://github.com/nalantishantha/BloxLogicAI.git
 cd BloxLogicAI
 
 # 2. Create and activate virtual environment

@@ -1,0 +1,66 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+.Python
+env/
+venv/
+.venv/
+ENV/
+
+# Streamlit
+.streamlit/
+
+# Models (serialized)
+models/saved/*.json
+models/saved/*.pkl
+!models/saved/.gitkeep
+
+# Data
+data/raw/*
+data/processed/*
+!data/raw/.gitkeep
+!data/processed/.gitkeep
+
+# Blockchain ledger (runtime file)
+blockchain/ledger.json
+
+# QR code output
+*.png
+docs/*.png
+!docs/architecture_diagram.png
+!docs/blockchain_flow.png
+
+# Environment
+.env
+*.env
+
+# IDE
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Pytest / coverage
+.pytest_cache/
+.coverage
+htmlcov/
+
+# AI dev tools
+.serena/
+
+# Personal planning / notes
+daily-plans/
+pre-implementation-plan.md

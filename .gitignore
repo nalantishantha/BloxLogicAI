@@ -18,16 +18,11 @@ ENV/
 # Streamlit
 .streamlit/
 
-# Models (serialized)
-models/saved/*.json
+# Models (serialized) — keep the trained model + metrics committed for the demo
 models/saved/*.pkl
-!models/saved/.gitkeep
 
-# Data
-data/raw/*
-data/processed/*
-!data/raw/.gitkeep
-!data/processed/.gitkeep
+# Data — only large third-party source data is kept out of git
+data/sources/
 
 # Blockchain ledger (runtime file)
 blockchain/ledger.json

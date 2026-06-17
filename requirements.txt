@@ -11,3 +11,5 @@ qrcode[pil]==7.4.2
 openpyxl==3.1.2
 Pillow==10.3.0
 pytest==8.2.2  # dev/testing
+notebook==7.2.1  # dev: Phase A research notebook
+ipykernel==6.29.5  # dev: notebook kernel for the venv

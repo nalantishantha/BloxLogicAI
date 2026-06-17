@@ -16,6 +16,7 @@ Real sources (data/sources/):
 from __future__ import annotations
 
 import os
+import glob
 import pandas as pd
 
 # ---------------------------------------------------------------------------
@@ -27,10 +28,21 @@ SOURCES = os.path.join(ROOT, "data", "sources")
 PROCESSED = os.path.join(ROOT, "data", "processed")
 
 TEA_RAW = os.path.join(RAW, "monthly_tea_raw.csv")
-USD_CSV = os.path.join(SOURCES, "USDtoLKR.csv")
-WEATHER_CSV = os.path.join(SOURCES, "climate", "SriLanka_Weather_Dataset.csv")
+USD_CSV = os.path.join(SOURCES, "usd_lkr_historical.csv")
+WEATHER_DIR = os.path.join(SOURCES, "sri_lanka_weather_data")
 EXPORT_CSV = os.path.join(SOURCES, "Export_Data_2011_to_2026.csv")
 PRODUCTION_CSV = os.path.join(SOURCES, "Production_Data_2011_to_2026.csv")
+
+# Tea-growing districts -> elevation zone (matches the High/Medium/Low production split).
+# The per-district weather files include Nuwara Eliya & Badulla (high-grown); dry-zone /
+# non-tea districts (Hambantota, Jaffna, Colombo, etc.) are deliberately excluded so the
+# climate signal reflects where tea is actually grown.
+TEA_DISTRICT_ZONES = {
+    "Nuwara Eliya": "High", "Badulla": "High",
+    "Kandy": "Medium", "Matale": "Medium",
+    "Ratnapura": "Low", "Kegalle": "Low", "Galle": "Low",
+    "Matara": "Low", "Kalutara": "Low",
+}
 
 # Official SLTB annual export totals (MT) — used to derive 2022-12 and validate.
 ANNUAL_EXPORT_MT = {2021: 286016, 2022: 250191, 2023: 241912}
@@ -84,70 +96,98 @@ def load_production_monthly() -> pd.DataFrame:
 # Macro: USD/LKR daily -> monthly
 # ---------------------------------------------------------------------------
 def load_macro_monthly() -> pd.DataFrame:
-    """Monthly USD/LKR: mean rate + intra-month volatility (std of daily rate)."""
-    df = pd.read_csv(USD_CSV, skip_blank_lines=True)
-    df.columns = [c.strip() for c in df.columns]
-    df = df.dropna(subset=["Date"])
-    df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
-    df = df.dropna(subset=["Date"])
-    df["rate"] = pd.to_numeric(df["Exchange Rate"], errors="coerce")
-    df = df.dropna(subset=["rate"])
-    df["month"] = df["Date"].dt.to_period("M")
+    """Monthly USD/LKR: mean rate + intra-month volatility (std of daily close).
+
+    Source: usd_lkr_historical.csv - a Yahoo `LKR=X` daily export (2011-2026) with two
+    metadata rows under the header; the date sits in the 'Price' column, the rate in 'Close'.
+    """
+    df = pd.read_csv(USD_CSV, skiprows=[1, 2])
+    df = df.rename(columns={"Price": "date", "Close": "rate"})
+    df["date"] = pd.to_datetime(df["date"], errors="coerce")
+    df["rate"] = pd.to_numeric(df["rate"], errors="coerce")
+    df = df.dropna(subset=["date", "rate"])
+    df["month"] = df["date"].dt.to_period("M").dt.to_timestamp()
     out = (
         df.groupby("month")["rate"]
         .agg(usd_lkr_avg="mean", usd_lkr_volatility="std")
         .reset_index()
     )
-    out["month"] = out["month"].dt.to_timestamp()
     return out
 
 
 # ---------------------------------------------------------------------------
-# Climate: daily 30-city weather -> national monthly
+# Production by elevation zone (used to weight the tea-region weather)
+# ---------------------------------------------------------------------------
+def load_production_by_zone() -> pd.DataFrame:
+    """Monthly tea production (MT) split by elevation zone: High / Medium / Low."""
+    df = pd.read_csv(PRODUCTION_CSV, usecols=range(4),
+                     names=["month", "elev", "qty_kg", "mrec"], header=0)
+    df["month"] = pd.to_datetime(df["month"].fillna(df["mrec"]), errors="coerce")
+    df["qty_kg"] = pd.to_numeric(df["qty_kg"], errors="coerce")
+    df["elev"] = df["elev"].astype(str).str.strip()
+    df = df[df["elev"].isin(["High", "Medium", "Low"])].dropna(subset=["month", "qty_kg"])
+    wide = (df.groupby(["month", "elev"])["qty_kg"].sum().unstack("elev") / 1000.0)
+    wide = wide.reindex(columns=["High", "Medium", "Low"])
+    wide.columns = ["prod_high", "prod_medium", "prod_low"]
+    return wide.reset_index()
+
+
+def _prod_weighted(zone_df: pd.DataFrame, shares: pd.DataFrame) -> pd.Series:
+    """Combine per-zone monthly weather into one national series, weighted by production share.
+
+    Months/zones lacking weather fall back to equal weights; weights are renormalised so the
+    national value always averages whatever zones are present.
+    """
+    cols = [c for c in ["High", "Medium", "Low"] if c in zone_df.columns]
+    zone_df = zone_df[cols]
+    w = shares.reindex(zone_df.index).reindex(columns=cols)
+    w = w.fillna(pd.DataFrame(1.0, index=zone_df.index, columns=cols))
+    w = w.where(zone_df.notna())
+    w = w.div(w.sum(axis=1), axis=0)
+    return (zone_df * w).sum(axis=1, min_count=1)
+
+
+# ---------------------------------------------------------------------------
+# Climate: per-district daily weather -> production-weighted tea-region monthly
 # ---------------------------------------------------------------------------
 def load_weather_monthly() -> pd.DataFrame:
-    """National monthly climate: rainfall (mm) and mean temperature (C).
+    """National monthly tea-region climate: rainfall (mm) and mean temperature (C).
 
-    Rainfall = mean across cities of each city's monthly total precipitation.
-    Temp     = mean across cities and days of daily mean temperature.
-    Jul-Oct 2023 (beyond weather coverage) imputed from 2010-2023 monthly
-    climatology so the anomaly window can reach Oct 2023.
+    Reads the per-district daily files in data/sources/sri_lanka_weather_data/ (2011-2026),
+    keeps only the tea-growing districts (TEA_DISTRICT_ZONES), aggregates to monthly per
+    elevation zone, then combines the zones weighted by each month's share of national
+    production so the biggest-producing elevations dominate. Dry-zone / non-tea districts are
+    excluded so the signal reflects where tea is actually grown.
     """
-    df = pd.read_csv(WEATHER_CSV, usecols=["time", "precipitation_sum",
-                                           "temperature_2m_mean", "city"])
-    df["time"] = pd.to_datetime(df["time"], errors="coerce")
-    df = df.dropna(subset=["time"])
-    df["month"] = df["time"].dt.to_period("M")
+    files = sorted(glob.glob(os.path.join(WEATHER_DIR, "*.csv")))
+    raw = pd.concat((pd.read_csv(f) for f in files), ignore_index=True)
+    raw = raw[raw["district"].isin(TEA_DISTRICT_ZONES)].copy()
+    raw["date"] = pd.to_datetime(raw["date"], errors="coerce")
+    raw = raw.dropna(subset=["date"])
+    raw["rain"] = pd.to_numeric(raw["rain_sum"], errors="coerce")
+    raw["temp"] = (pd.to_numeric(raw["temperature_2m_max"], errors="coerce")
+                   + pd.to_numeric(raw["temperature_2m_min"], errors="coerce")) / 2.0
+    raw["zone"] = raw["district"].map(TEA_DISTRICT_ZONES)
+    raw["month"] = raw["date"].dt.to_period("M").dt.to_timestamp()
 
-    # per city-month: total rain, mean temp
-    city_month = (
-        df.groupby(["city", "month"])
-        .agg(rain=("precipitation_sum", "sum"),
-             temp=("temperature_2m_mean", "mean"))
-        .reset_index()
-    )
-    # national: average across cities
-    nat = (
-        city_month.groupby("month")
-        .agg(rainfall_mm=("rain", "mean"), temp_mean=("temp", "mean"))
-        .reset_index()
-    )
-    nat["month"] = nat["month"].dt.to_timestamp()
+    # per district-month: total rain, mean temp -> per zone-month: mean across districts
+    dm = (raw.groupby(["zone", "district", "month"])
+             .agg(rain=("rain", "sum"), temp=("temp", "mean")).reset_index())
+    zm = (dm.groupby(["zone", "month"])
+             .agg(rain=("rain", "mean"), temp=("temp", "mean")).reset_index())
+    rain_z = zm.pivot(index="month", columns="zone", values="rain")
+    temp_z = zm.pivot(index="month", columns="zone", values="temp")
 
-    # monthly climatology for imputation
-    nat["m"] = nat["month"].dt.month
-    clim = nat.groupby("m").agg(rainfall_mm=("rainfall_mm", "mean"),
-                                temp_mean=("temp_mean", "mean"))
+    # production-share weights per month
+    shares = load_production_by_zone().set_index("month")[["prod_high", "prod_medium", "prod_low"]]
+    shares.columns = ["High", "Medium", "Low"]
+    shares = shares.div(shares.sum(axis=1), axis=0)
 
-    # extend to 2023-10 if weather ends earlier
-    full = pd.date_range("2019-01-01", "2023-10-01", freq="MS")
-    nat = nat.set_index("month").reindex(full)
-    nat.index.name = "month"
-    nat["m"] = nat.index.month
-    for col in ["rainfall_mm", "temp_mean"]:
-        nat[col] = nat[col].fillna(nat["m"].map(clim[col]))
-    nat = nat.drop(columns="m").reset_index()
-    return nat
+    return pd.DataFrame({
+        "month": rain_z.index,
+        "rainfall_mm": _prod_weighted(rain_z, shares).values,
+        "temp_mean": _prod_weighted(temp_z, shares).values,
+    })
 
 
 # ---------------------------------------------------------------------------
@@ -221,6 +261,43 @@ def build_forecast_dataset() -> pd.DataFrame:
 
 
 # ---------------------------------------------------------------------------
+# View 1b — multivariate forecast dataset (Prophet with regressors)
+# ---------------------------------------------------------------------------
+MV_REGRESSORS = ["production_mt", "usd_lkr_avg", "rainfall_mm", "temp_mean"]
+
+
+def build_multivariate_dataset() -> pd.DataFrame:
+    """Continuous monthly frame for Prophet-with-regressors.
+
+    Columns: ds, y (export MT) + the driver regressors (production, USD/LKR, tea-region
+    rainfall & temperature), each on a continuous monthly spine over the export coverage.
+    Small internal gaps are time-interpolated per column and flagged in `<col>_imputed`.
+    With all drivers now spanning 2011-2026 the frame is gap-free apart from a few
+    export / production months.
+    """
+    exp = load_export_monthly().rename(columns={"month": "ds", "export_mt": "y"})
+    prod = load_production_monthly().rename(columns={"month": "ds"})
+    macro = load_macro_monthly()[["month", "usd_lkr_avg"]].rename(columns={"month": "ds"})
+    weather = load_weather_monthly().rename(columns={"month": "ds"})
+
+    spine = pd.date_range(exp["ds"].min(), exp["ds"].max(), freq="MS")
+    df = (pd.DataFrame({"ds": spine})
+          .merge(exp, on="ds", how="left")
+          .merge(prod, on="ds", how="left")
+          .merge(macro, on="ds", how="left")
+          .merge(weather, on="ds", how="left")
+          .set_index("ds"))
+
+    for col in ["y"] + MV_REGRESSORS:
+        df[f"{col}_imputed"] = df[col].isna()
+        df[col] = df[col].interpolate(method="time", limit_direction="both")
+    df = df.reset_index()
+
+    keep = ["ds", "y", "y_imputed"] + MV_REGRESSORS + [f"{c}_imputed" for c in MV_REGRESSORS]
+    return df[keep]
+
+
+# ---------------------------------------------------------------------------
 # View 2 — Isolation Forest anomaly dataset
 # ---------------------------------------------------------------------------
 def build_anomaly_dataset(master: pd.DataFrame | None = None) -> pd.DataFrame:
@@ -252,12 +329,29 @@ def _summ(df: pd.DataFrame, cols) -> str:
 
 if __name__ == "__main__":
     os.makedirs(PROCESSED, exist_ok=True)
+
+    # View 1 - univariate forecast dataset (unchanged; keeps the current app working)
     fc = build_forecast_dataset()
     fc.to_csv(os.path.join(PROCESSED, "forecast_dataset.csv"), index=False)
-
     print("=== FORECAST (Prophet, univariate export volume) ===")
     print(_summ(fc, ["y"]))
     print(f"range {fc.ds.min():%Y-%m} -> {fc.ds.max():%Y-%m}; imputed y: {int(fc.y_imputed.sum())}")
     yr = fc.assign(year=fc.ds.dt.year).groupby("year")["y"].sum().round(0)
     print("annual export (MT):", {int(k): int(v) for k, v in yr.items()})
-    print("\nWrote: forecast_dataset.csv -> data/processed/")
+
+    # View 1b - multivariate forecast dataset (ds, y + production/FX/weather regressors)
+    mv = build_multivariate_dataset()
+    mv.to_csv(os.path.join(PROCESSED, "forecast_multivariate.csv"), index=False)
+    print("\n=== MULTIVARIATE (Prophet + regressors) ===")
+    print(_summ(mv, ["y"] + MV_REGRESSORS))
+    print(f"range {mv.ds.min():%Y-%m} -> {mv.ds.max():%Y-%m}; "
+          f"imputed production: {int(mv.production_mt_imputed.sum())}")
+
+    # Processed driver series (committed so the repo reproduces without the raw sources)
+    prod = load_production_monthly().merge(load_production_by_zone(), on="month", how="left")
+    prod.to_csv(os.path.join(PROCESSED, "production_monthly.csv"), index=False)
+    load_macro_monthly().to_csv(os.path.join(PROCESSED, "fx_monthly.csv"), index=False)
+    load_weather_monthly().to_csv(os.path.join(PROCESSED, "weather_tea_monthly.csv"), index=False)
+
+    print("\nWrote -> data/processed/: forecast_dataset.csv, forecast_multivariate.csv, "
+          "production_monthly.csv, fx_monthly.csv, weather_tea_monthly.csv")

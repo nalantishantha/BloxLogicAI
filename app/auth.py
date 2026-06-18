@@ -37,7 +37,7 @@ MIN_PASSWORD_LENGTH = 8
 # Seeded administrator (created on first run if no admin exists).
 SEED_ADMIN_USERNAME = "admin"
 SEED_ADMIN_EMAIL = "admin@bloxlogic.ai"
-SEED_ADMIN_PASSWORD = "admin123"
+SEED_ADMIN_PASSWORD = os.environ.get("BLOXLOGIC_ADMIN_PASSWORD", "admin123")
 
 
 # ---------------------------------------------------------------------------
@@ -139,6 +139,35 @@ def add_user(username: str, email: str, password: str,
         df = pd.concat([df, pd.DataFrame([row])], ignore_index=True)
         _save_users(df, path)
     return True, f"Account '{username}' created. You can now log in."
+
+
+def remove_user(username: str, path: str = USERS_CSV) -> tuple[bool, str]:
+    """Delete a non-admin user inside the lock. Returns (ok, message)."""
+    with _users_lock:
+        df = load_users(path)
+        row = df[df["username"].str.lower() == username.lower()]
+        if row.empty:
+            return False, f"User '{username}' not found."
+        if row.iloc[0]["role"] == "admin":
+            return False, "Admin accounts cannot be deleted."
+        df = df[df["username"].str.lower() != username.lower()]
+        _save_users(df, path)
+    return True, f"User '{username}' removed."
+
+
+def update_password(username: str, new_password: str,
+                    path: str = USERS_CSV) -> tuple[bool, str]:
+    """Update the password hash for an existing user inside the lock."""
+    if len(new_password) < MIN_PASSWORD_LENGTH:
+        return False, f"Password must be at least {MIN_PASSWORD_LENGTH} characters."
+    with _users_lock:
+        df = load_users(path)
+        mask = df["username"].str.lower() == username.lower()
+        if not mask.any():
+            return False, f"User '{username}' not found."
+        df.loc[mask, "password"] = hash_password(new_password)
+        _save_users(df, path)
+    return True, f"Password for '{username}' updated."
 
 
 def authenticate(username: str, password: str,

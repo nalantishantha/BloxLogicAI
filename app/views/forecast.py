@@ -36,7 +36,10 @@ def get_data(model_type: str = "univariate") -> pd.DataFrame:
         df = builder()
         os.makedirs(os.path.dirname(path), exist_ok=True)
         df.to_csv(path, index=False)
-    return pd.read_csv(path, parse_dates=["ds"])
+    df = pd.read_csv(path, parse_dates=["ds"])
+    if "y_imputed" in df.columns:
+        df["y_imputed"] = df["y_imputed"].astype(bool)
+    return df
 
 
 @st.cache_resource(show_spinner="Training Prophet model…")

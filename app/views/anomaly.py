@@ -30,10 +30,22 @@ def _badge(severity: str) -> str:
 
 
 def render() -> None:
+    try:
+        import pandas as pd
+        from app.config import ANOMALY_CSV
+        df_an = pd.read_csv(ANOMALY_CSV)
+        start_date = pd.to_datetime(df_an['month']).min().strftime('%Y-%m')
+        end_date = pd.to_datetime(df_an['month']).max().strftime('%Y-%m')
+        obs_count = len(df_an)
+    except Exception:
+        start_date = "2011-10"
+        end_date = "2026-04"
+        obs_count = 165
+
     st.header("Anomaly Detection")
     st.caption(
-        "Supply chain disruptions identified by Isolation Forest — "
-        "historical period 2019–2023."
+        f"Supply chain disruptions identified by Isolation Forest — "
+        f"historical period {start_date} to {end_date}."
     )
 
     # ── Filter row ───────────────────────────────────────────────────────────
@@ -53,6 +65,7 @@ def render() -> None:
     )
 
     with col_info:
+        st.markdown("<div style='margin-top:28px'></div>", unsafe_allow_html=True)
         st.info(
             f"**{len(alerts)}** alert(s) shown  ·  "
             "Model: Isolation Forest  ·  "
@@ -100,10 +113,10 @@ def render() -> None:
     # ── Methodology note ─────────────────────────────────────────────────────
     with st.expander("About this model"):
         st.markdown(
-            """
+            f"""
 **Algorithm:** Isolation Forest (scikit-learn)
 
-**Training window:** 2011-10 to 2026-04 (~160 clean monthly observations)
+**Training window:** {start_date} to {end_date} (~{obs_count} clean monthly observations)
 
 **Features used:**
 - Monthly export volume (MT)

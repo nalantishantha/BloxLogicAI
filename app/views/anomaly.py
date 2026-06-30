@@ -56,7 +56,7 @@ def render() -> None:
         st.info(
             f"**{len(alerts)}** alert(s) shown  ·  "
             "Model: Isolation Forest  ·  "
-            "Features: export volume, production, USD/LKR, rainfall, temperature",
+            "Features: export volume, production, USD/LKR, rainfall, temperature, crude oil, fuel prices",
             icon=None,
         )
 
@@ -103,7 +103,7 @@ def render() -> None:
             """
 **Algorithm:** Isolation Forest (scikit-learn)
 
-**Training window:** 2019-01 to 2023-12 (~60 clean monthly observations)
+**Training window:** 2011-10 to 2026-04 (~160 clean monthly observations)
 
 **Features used:**
 - Monthly export volume (MT)
@@ -111,6 +111,8 @@ def render() -> None:
 - USD/LKR exchange rate (monthly average)
 - Rainfall (mm) — production-weighted tea regions
 - Mean temperature (°C) — production-weighted tea regions
+- Crude Oil Price & Brent Crude Price
+- Fuel Prices (LP 92, Auto Diesel, Kerosene)
 
 **How it works:** Isolation Forest isolates anomalies by building random decision trees.
 Points that are isolated with fewer splits are flagged as anomalies. The model assigns

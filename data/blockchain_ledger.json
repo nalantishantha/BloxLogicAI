@@ -138,15 +138,5 @@
     "timestamp": "2026-01-27T06:00:00",
     "previous_hash": "36ed34f814722336fd5b87783a1a1658d48b773da334bf0a2dff51e116dac842",
     "current_hash": "9f25c5b412a4cf5fe8080df95ffb67926f6f9d53bcdeeceef0450621f19a73aa"
-  },
-  {
-    "batch_id": "TEA004",
-    "seq": 1,
-    "stage": "Harvested",
-    "location": "morawatta estate, ruwanwella, kegalle",
-    "details": "2,000 kg Orthodox green Tea harvested; leaf grade: BOP",
-    "timestamp": "2026-07-01T09:37:11",
-    "previous_hash": "0000000000000000",
-    "current_hash": "96bea447a058260c743e612ab066a42c42a409b894834297d90b7d1f147388ba"
   }
 ]

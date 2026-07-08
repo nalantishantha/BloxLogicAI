@@ -74,6 +74,11 @@ def _render_forecast_preview() -> None:
     )
 
     try:
+        from app.config import FORECAST_CSV, MODEL_PATH
+        if not os.path.exists(FORECAST_CSV) or not os.path.exists(MODEL_PATH):
+            st.info("ℹ️ Live forecast data is currently unavailable. (Clean slate demo mode: please log in as an administrator to generate datasets and train the AI models).")
+            return
+
         with st.spinner("Loading real-time forecast model..."):
             from app.views.forecast import get_data, get_forecast, load_metrics
             df = get_data("univariate")

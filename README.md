@@ -167,7 +167,7 @@ For full guidelines on how to contribute, please read our [CONTRIBUTING.md](CONT
 
 ## Contact
 
-**Your Name** - [GitHub Profile](https://github.com/nalantishantha) - your.email@example.com
+**Name** - [GitHub Profile](https://github.com/nalantishantha) - [EMAIL_ADDRESS]
 
 Project Link: [https://github.com/nalantishantha/BloxLogicAI](https://github.com/nalantishantha/BloxLogicAI)
 

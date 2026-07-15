@@ -95,6 +95,22 @@ else:
     page = st.session_state.current_page
 
     # ── Sidebar Bottom: user info & sign out ────────────────────────────────
+    st.sidebar.markdown(
+        """
+        <style>
+            [data-testid="stSidebarUserContent"] {
+                display: flex;
+                flex-direction: column;
+                flex-grow: 1;
+            }
+            [data-testid="stSidebarUserContent"] > div:has(.sidebar-spacer) {
+                flex-grow: 1;
+            }
+        </style>
+        <div class="sidebar-spacer"></div>
+        """,
+        unsafe_allow_html=True,
+    )
     st.sidebar.divider()
     st.sidebar.markdown(
         f"<div style='text-align: center; margin-bottom: 10px; font-weight: 600; font-size: 16px;'>{user['username']}</div>",

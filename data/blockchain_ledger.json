@@ -138,5 +138,15 @@
     "timestamp": "2026-01-27T06:00:00",
     "previous_hash": "36ed34f814722336fd5b87783a1a1658d48b773da334bf0a2dff51e116dac842",
     "current_hash": "9f25c5b412a4cf5fe8080df95ffb67926f6f9d53bcdeeceef0450621f19a73aa"
+  },
+  {
+    "batch_id": "TEA004",
+    "seq": 1,
+    "stage": "Harvested",
+    "location": "Kithulgala",
+    "details": "2000kg, balck tea",
+    "timestamp": "2026-07-08T12:53:08",
+    "previous_hash": "0000000000000000",
+    "current_hash": "6be26883a3f3a3954cab2ff785d757aa5c0770ca0fc97ebbf6896b2904731a82"
   }
 ]

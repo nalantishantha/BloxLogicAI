@@ -19,6 +19,10 @@ _CSS = """
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap');
 
 /* ── Typography & Global Theme ────────────────────────────────────────── */
+.block-container {
+    padding-top: 1.5rem !important;
+}
+
 html, body, [class*="css"] {
     font-family: 'Inter', sans-serif;
 }

@@ -134,6 +134,18 @@ Administrators have full visibility into the raw Blockchain Ledger.
 ![Blockchain Ledger](images/blockchain_ledger_admin.png)
 *Figure 11: The raw cryptographic ledger viewed by an admin.*
 
+### Forecast Model Training
+This section allows administrators to retrain the AI demand forecasting model using the latest data. The system utilizes Facebook Prophet, and administrators can trigger a complete retrain when new tea export datasets are uploaded. Admins use this feature to ensure the forecasting predictions remain highly accurate and reflect the most recent market trends, keeping stakeholders well-informed.
+
+### Anomaly Detection Model Training
+The anomaly detection training interface enables administrators to update the Scikit-Learn Isolation Forest model. By retraining this model, the system recalibrates its understanding of "normal" supply chain behavior based on newly ingested historical data. Admins use this to refine the early-warning alerts, ensuring the platform accurately flags new types of disruptions such as novel climate events or sudden geopolitical shifts without generating false positives.
+
+### User Management
+The User Management panel provides administrators with tools to control access to the BloxLogicAI platform. It allows admins to view a list of all registered users, reset passwords, change user roles (e.g., standard user vs. admin), and deactivate accounts if necessary. Admins use this centralized interface to maintain system security, ensure only authorized personnel access sensitive supply chain data, and assist users who have lost their login credentials.
+
+### Analytics
+The Analytics dashboard gives administrators a comprehensive, high-level view of overall system usage and performance metrics. It aggregates data on user activity, model performance, and the frequency of anomalies detected over time. Admins use these insights to monitor the health of the application, identify usage bottlenecks, and report on the overall value the platform is delivering to the tea industry.
+
 ---
 
 ## 5. Troubleshooting & FAQs
